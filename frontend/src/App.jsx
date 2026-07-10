@@ -1,122 +1,137 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { Dumbbell, Calendar, BarChart2, LogOut } from 'lucide-react';
+import { api } from './utils/api';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import ActiveSession from './pages/ActiveSession';
+import History from './pages/History';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [currentView, setCurrentView] = useState('login'); // login, dashboard, session, history
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionName, setActiveSessionName] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Check if user has an active session cookie on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const data = await api.checkSession();
+        if (data.user) {
+          setUser(data.user);
+          // If user was in the middle of a session, we resume it if the backend returns it
+          if (data.activeSession) {
+            setActiveSessionId(data.activeSession.id);
+            setActiveSessionName(data.activeSession.workout_day_name);
+            setCurrentView('session');
+          } else {
+            setCurrentView('dashboard');
+          }
+        } else {
+          setCurrentView('login');
+        }
+      } catch (err) {
+        setCurrentView('login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
+  }, []);
+
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    setCurrentView('dashboard');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    setUser(null);
+    setActiveSessionId(null);
+    setCurrentView('login');
+  };
+
+  const handleStartSession = (sessionId, dayName) => {
+    setActiveSessionId(sessionId);
+    setActiveSessionName(dayName);
+    setCurrentView('session');
+  };
+
+  const handleCancelSession = () => {
+    if (window.confirm('Are you sure you want to cancel? This session logs will be deleted.')) {
+      // Typically the backend has a DELETE session endpoint, but to keep it simple, we just discard and return
+      setActiveSessionId(null);
+      setCurrentView('dashboard');
+    }
+  };
+
+  const handleFinishSession = () => {
+    setActiveSessionId(null);
+    setCurrentView('history'); // Take them to history to see their newly logged entries!
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-primary)', color: 'var(--color-text-muted)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <Dumbbell className="logo-icon animate-pulse" size={48} style={{ animation: 'pulse 1.5s infinite', margin: '0 auto 16px auto', color: 'var(--color-primary)' }} />
+          <p style={{ fontFamily: "'Outfit', sans-serif" }}>GymBro is loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div id="root">
+      {user && currentView !== 'session' && (
+        <header className="app-header">
+          <div className="header-container">
+            <div className="logo" onClick={() => setCurrentView('dashboard')} style={{ cursor: 'pointer' }}>
+              <Dumbbell className="logo-icon" size={22} />
+              <span>GymBro</span>
+            </div>
+            
+            <nav className="nav-links">
+              <button 
+                className={`nav-btn ${currentView === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setCurrentView('dashboard')}
+              >
+                <Calendar size={18} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} /> Dashboard
+              </button>
+              <button 
+                className={`nav-btn ${currentView === 'history' ? 'active' : ''}`}
+                onClick={() => setCurrentView('history')}
+              >
+                <BarChart2 size={18} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} /> History
+              </button>
+              <button className="nav-btn" onClick={handleLogout} style={{ color: '#ef4444' }}>
+                <LogOut size={18} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} /> Logout
+              </button>
+            </nav>
+          </div>
+        </header>
+      )}
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <main style={{ flex: 1 }}>
+        {currentView === 'login' && <Login onAuthSuccess={handleAuthSuccess} />}
+        {currentView === 'dashboard' && <Dashboard user={user} onStartSession={handleStartSession} />}
+        {currentView === 'session' && (
+          <ActiveSession 
+            sessionId={activeSessionId} 
+            workoutDayName={activeSessionName} 
+            onCancel={handleCancelSession}
+            onFinish={handleFinishSession}
+          />
+        )}
+        {currentView === 'history' && <History />}
+      </main>
+    </div>
+  );
 }
-
-export default App
